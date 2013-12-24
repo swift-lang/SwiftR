@@ -1,0 +1,13 @@
+Index: modules/provider-coaster/src/org/globus/cog/abstraction/coaster/service/CoasterService.java
+===================================================================
+--- modules/provider-coaster/src/org/globus/cog/abstraction/coaster/service/CoasterService.java	(revision 3145)
++++ modules/provider-coaster/src/org/globus/cog/abstraction/coaster/service/CoasterService.java	(working copy)
+@@ -41,7 +41,7 @@
+     public static final Logger logger = Logger
+             .getLogger(CoasterService.class);
+ 
+-    public static final int IDLE_TIMEOUT = 120 * 1000;
++    public static final int IDLE_TIMEOUT = 120 * 1000 /* extend it: */ * 30 * 240;
+     
+     public static final int CONNECT_TIMEOUT = 2 * 60 * 1000;
+ 

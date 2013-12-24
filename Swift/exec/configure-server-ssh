@@ -1,0 +1,35 @@
+#! /usr/bin/env bash
+
+
+
+cat >tc <<END
+sshcoast  bash      /bin/bash null null ENV::PATH="$PATH";GLOBUS::maxwalltime="$time"
+END
+
+cat >sites.xml <<END
+<config>
+  <pool handle="sshcoast">
+    <execution provider="coaster" url="none" jobmanager="local:NA"/>
+    <profile namespace="globus" key="workerManager">passive</profile>
+    <profile namespace="globus" key="workersPerNode">$cores</profile>
+    <profile namespace="karajan" key="jobThrottle">$throttle</profile>
+    <profile namespace="karajan" key="initialScore">10000</profile>
+    <filesystem provider="local" url="none"/>
+    <workdirectory>$(pwd)/swiftwork</workdirectory>
+    <workdirectory>$(pwd)/swiftscratch</workdirectory>
+  </pool>
+
+</config>
+END
+
+cat >cf <<END
+wrapperlog.always.transfer=false
+sitedir.keep=false
+execution.retries=$num_retries
+lazy.errors=false
+status.mode=provider
+use.provider.staging=true
+provider.staging.pin.swiftfiles=true
+#throttle.host.submit=1
+END
+

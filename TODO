@@ -1,0 +1,325 @@
+*** TO DO LIST:
+
+
+
+Thu:
+why script.pl appears in coasters dir for manual coasters?
+
+more flexibility in ssh mehanism
+
+need globus_hostname?
+
+job cleanup improvement
+
+tcsh ok?
+
+
+
+BUG: Passivate failing on swift pbs config on pads.
+^^^^^^^^^^^^^^^^^^
+
+MAIN
+
+- still seeing sleep 1 mutex?
+
+- make it easy to adjust ncores (or base it on local host cores from CPUINFO)
+
+- minimal logging in cf
+
+- timing as an option (swift.tracktimes/showtimes); print or update a log array.
+
+- silent vs logging as an option
+
+- make order of R-vs-start-swift startup work either way
+
+- make start-swift restartable within a single R swiftapply()
+
+- only lapply is implemented (also SwiftApply) - need to see if we can cut down arg passing overhead for many of the apply() cases
+
+x complete change for envvars like SWIFTR_TMP
+- add sourcing of $HOME/.SwiftR.init: pick up variables for the configure_ scripts from here; maybe one file in this dir for each site supported? maybe configure scripts go here?
+
+- try coasters to communicado-bridled: use simple script for passive coasters: ala swift/lab/mcsswift.sh?
+- try tests of coasters provider staging
+
+- coaster provider data mover
+- tracef to replace job
+- interrupt a pipe read in R
+- develop the common config-site-$SITE scripts
+- finalize() method to clean up request dir?
+- test with swift logging turned way down
+- make tmpdir a param; for start-nnn scripts use SWIFTR_TMP, ~/.SwiftR
+- make ports flexible and non-conflicting
+
+X initVar only affects first calls on a server - if you change these you need to start a new server (FIXME)!
+X better handlig of initvars: detet if it changes; work corrcetly if its empty or missing.
+
+See if we can get Swift to just shut down the channel and start it again?
+- no extended idle timer
+- start new swift worker
+- kill old R workers?
+
+- replace all cat() calls with printf()
+
+- implement swiftping(serverName): access fifo non-blocking and poll for results with 1-sec sleeps.  Try N times, echoing response or lack of.  options: rualive, do-simple-R-eval.
+
+- implement swiftserver(configName, hosts=c("h1",...,"hN"), cpus=N, ... )
+
+  swiftserver(start,stop,ping,status)
+
+
+- dont put full Swift release in package; download automatically at install time, and build from source. This is needed to make SwiftR CRAN-eligible.
+
+- streamline RPC calling path by minimizing file creation and any other costly operations.
+
+test logic for creating trundir in start-swift-Rserver
+
+test for suitable java in start-swift command.
+
+test using persistent server and ssh to communcado; then mcs.
+
+  how to get worker.pl from Swift to Swift R package exec/ dir
+
+  start-swift-workers: if hostis localhost, launch workers directly, not with ssh
+
+fixed: ??  debug why workers/coasters hang after several minutes of idle time
+
+- fix R hanging on fifo read. be able to interrupt it and re-sync. maybe change to read and file not fifo?
+
+
+-----
+
+  find why TestSwift is faster with local internal coaster service (13 secs) than with external service (19 seconds)
+  If thats true, maybe use local internal ervice for local exec if possible.
+
+  Ensure that shell startup overhead is not impacting swiftapply() latency
+
+  Do R functions to start stop list and manage service processes, both ocal and remote
+
+  Get traces into R vars of swiftapply performance
+
+Init perf #s (from Crush)
+11 runs, ~17 secs real time each. CPU times are below:
+
+wilde     5804  5794  5804  5804  0 09:15 pts/12   00:00:00         bash
+wilde     7182  5804  7182  5804  0 09:23 pts/12   00:00:00           /bin/bash /homes/wilde/RLibrary/Swift/exec/start-swift-workers
+wilde     7193  7182  7182  5804  0 09:23 pts/12   00:00:00             /bin/sh /homes/wilde/RLibrary/Swift/exec/../swift/bin/coaster
+wilde     7219  7193  7182  5804  0 09:23 pts/12   00:00:07               java -Djava.endorsed.dirs=/homes/wilde/RLibrary/Swift/exec/
+wilde     7625  7182  7182  5804  0 09:23 pts/12   00:00:00             /bin/bash /homes/wilde/RLibrary/Swift/exec/start-swift-Rserve
+wilde     7643  7625  7182  5804  0 09:23 pts/12   00:00:00               /bin/sh /homes/wilde/RLibrary/Swift/exec/../swift/bin/swift
+wilde     7706  7643  7182  5804  3 09:23 pts/12   00:00:34                 java -Xmx256M -Djava.endorsed.dirs=/homes/wilde/RLibrary/
+wilde     8268  5804  8268  5804  9 09:29 pts/12   00:01:01           /usr/lib64/R/bin/exec/R
+wilde    15581  5804 15581  5804  0 09:40 pts/12   00:00:00           ps -fjH -u wilde
+wilde    28836 28769 28769 28769  0 Sep20 ?        00:00:00 sshd: wilde@pts/1
+wilde    28837 28836 28837 28837  0 Sep20 pts/1    00:00:00   -bash
+wilde     7581  7513  7513  7513  0 09:23 ?        00:00:00 sshd: wilde@notty
+wilde     8926     1  7582  7582  2 09:34 ?        00:00:07 /usr/lib64/R/bin/exec/R --slave --no-restore --file=./SwiftRServer.sh --a
+wilde     8924     1  7582  7582  1 09:34 ?        00:00:06 /usr/lib64/R/bin/exec/R --slave --no-restore --file=./SwiftRServer.sh --a
+wilde     8918     1  7582  7582  1 09:34 ?        00:00:07 /usr/lib64/R/bin/exec/R --slave --no-restore --file=./SwiftRServer.sh --a
+wilde     8758     1  7582  7582  2 09:34 ?        00:00:07 /usr/lib64/R/bin/exec/R --slave --no-restore --file=./SwiftRServer.sh --a
+wilde     7587     1  7582  7582  1 09:23 ?        00:00:16 /usr/bin/perl /tmp/wilde/SwiftR/swiftworkerlogs/worker.pl http://140.221.
+wilde     7510     1  7182  5804  0 09:23 pts/12   00:00:00 ssh localhost /bin/sh -c 'WORKER_LOGGING_ENABLED=true /tmp/wilde/SwiftR/s
+
+7s   coaster service
+34s  swift
+1:01 R
+27s  R servers
+16   worker.pl
+
+R cli may have some overhead for processing answer each time.
+
+187 secs total real time.
+
+
+
+
+See if swift can write to pipe without using an app()
+
+Bundle start-swift-workers and RunRServer into one command;
+make it clean up on termination
+make workers either not time out or time out cleanly and end the whole set of processes
+
+change pricess names to separate R evel servers from Swift server etc.
+
+test against N MCS hosts (need a startup mechanism for them)
+
+Re-implement passive mode?
+
+Test other SwiftR service modes.
+
+Test OpenMx OmxApply speed.
+
+Get working on Mike Neales machines at vcu
+
+How to best clean up after start-swift-workers?
+- kill all procs below coaster-worker?
+- service to halpt worker?
+- why kill of ssh doesnt kill worker.pl?
+
+  logging as a Swift R option() flag.  Otherwise, silent.
+
+  Why cant ^C R when its wating on a fifo? (explore how BLOCKING=TRUE works)
+
+  integrate worker.pl changes into swift trunk; put code back in orig source order. (or not? if no intervening mods)
+
+  rename scripts to distinguish service that runs swift from service that runs R
+  #   swiftserver
+  #   rworker
+
+  Put loop around swift in R server to handle failures, for now.
+  Check all possible failures to harden the swift iterate loop from crashing
+
+  remove old files/rundirs  as a default to conserve disk space (both R and swift)
+    option to keep stuff for debugging
+
+
+---
+
+x Test with R daemons
+
+  insert performance logging
+
+  sampling/estimating: measure 1st call locally to determine data size and run time (if option swift.estimate=N samples random N % of calls; N=0 means dont sample).  Ideally sample only on the 1st invocation of that statement and remember value for that statement.
+
+  Test with OpenMx
+
+  work directory cleanup
+
+---
+
+
+  need persistent coaster service
+
+  output issues from swift worker to clean up (see bottom of this file):
+    "Directory no empty" worker.pl line 1001
+    unlink messages
+
+  clean up of R procs on remote side
+
+
+[] debug version
+    create version of swiftapply etc that runs by saving file, printing
+    message, and waiting for user to do "swiftrun" in a separate
+    window. This will mimic the exec path and enable a developer to debug
+    serially, and under a debugger, on both the client and server side.
+    --> did i do this already?
+
+x  check snow/fall code to see if we are missing anything for
+    transparent remote exec
+   (This was list propoerties; fixed now; anything else?)
+
+x n args
+x batch
+x into svn
+x unique dirs
+
+  clean up source code formatting: Use OpenMx conventions?
+    (spaces, tabbing?)
+
+For OpenMx 1.0:
+
+  coasters for persistent R Servers
+  handle entire apply family
+  determine if we should improve the way we handle options (ask OpenMx team)
+
+  use match.fun ( ??? )
+
+  ensure (and test) that all expected object attributes are passed and preserved on inputs and outputs (names, dims, etc)
+  capture stdout/err, perhaps with length limits, into R return vars
+  control over Swift properties; set defaults to "no retries":
+    Progress:  Active:7 Failed but can retry:2  ==> should not happen
+  R docs
+x R package (SwiftR)
+  Swift docs
+  pass the func as val ( ??? )
+  pass extra funcs and packages required
+  pass extra vals
+  pass extra files
+
+  better download and install of Swift (compliant with CRAN regs)
+  args as alists vs args as list( ??? )
+  return good error messages including messages from R eval and from Swift
+  Name pbs jobs mnemonically
+
+  options for cleaning up and/or retaining intermidiate save/load and stdout/err files
+  tools for displaying what was sent / received in calls (easy to pick apart from retained Rcall and Rret files)
+_ select sites and swift args (throttles etc)
+  Improve tests - see list below
+  
+  runids, output logging
+  select exec sites and swift  params etc
+  make polymorphic to *apply and snow
+
+For General R usage:
+
+  integration with snowfall/snow?
+
+  async exec
+  clean up boot: fix all calls to statistics; update boot package w/ pboot() or swiftboot()
+  error handling and null and missing values: ensure res#s correspond to arg#s
+  status
+  specify swift scripts
+  specify data files to be passed to remote side
+  setup the R envs (???)
+X specify initial R code to run on remote side: (if !initialized_swift) { initialRCodeHere }
+  run async and grab status (track 'runs' in R)
+  increm result collect
+  specifiy unique swift scritps ala Dirk's tools
+  use littleR
+  stream results back to R (so use can inspect as they arrive)
+    (pull them in with a Swift.poll() func)
+  handle discontiguous results (??) and incomplete results (not every element of apply() completes)
+  TUI (in various forms)
+
+*** TESTS NEEDED
+
+more tests
+test with better data that makes it easier to cross check the results
+dont require boot() for the test datasets
+but test (p)boot() if available
+add output data comparisons (or other output checks) to all tests 
+test across a bigger range of types and R weirnesses like local funcs, namespaces, non local assigns, closures, data types etc.
+test on matrices
+test on big matrixes etc to assure that we have no length issues
+tests to ensure all data object attrs passed in and out OK
+
+test strategy:
+- can we part data of arbitrary structure back and forth?
+- can we pass functions back and forth?
+- do the remote calls work the same regardless of whether they go to an R server or a pre-call R invocation
+
+flag to control # of tests and degree
+
+----
+
+OUTPUT and SWIFT EXEC ISSUES TO CLEAN UP:
+
+Issues below was that we created a long-lived process that hung on to open files, preventing jobdir from being removed.
+
+bri$ ./TestSwiftScript.sh run03
+swift output is in: swift.stdouterr.7124, pids in swift.workerpids.7124
+Swift svn swift-r3591 cog-r2868 (cog modified locally)
+
+RunID: 20100902-1723-etxm22pg
+Progress:
+Passive queue processor initialized. Callback URI is http://128.135.125.18:50003
+Coaster contact: http://128.135.125.18:50003
+Started workers from these ssh processes: 27297
+logilename: /home/wilde/SwiftR/run03/swiftworkerlogs/worker-2010.0902.172334.09027.log
+Progress:  Active:1
+Can't remove directory /home/wilde/SwiftR/run03/swiftwork/rtest-20100902-1723-etxm22pg-f-runr-f90rr6yj (Directory not empty) at /home/wilde/swift/lab/worker.pl line 1001
+Final status:  Finished successfully:1
+Cleaning up...
+Shutting down service at https://128.135.125.18:50002
+Got channel MetaChannel: 570110481[1922304900: {}] -> null[1922304900: {}]
++ Done
+unlink /home/wilde/SwiftR/run03/swiftwork/rtest-20100902-1723-etxm22pg-f-runr-f90rr6yj/_swiftwrap.staging
+unlink /home/wilde/SwiftR/run03/swiftwork/rtest-20100902-1723-etxm22pg-f-runr-f90rr6yj/outdir/r.0001.out
+rmdir /home/wilde/SwiftR/run03/swiftwork/rtest-20100902-1723-etxm22pg-f-runr-f90rr6yj/outdir
+unlink /home/wilde/SwiftR/run03/swiftwork/rtest-20100902-1723-etxm22pg-f-runr-f90rr6yj/3
+unlink /home/wilde/SwiftR/run03/swiftwork/rtest-20100902-1723-etxm22pg-f-runr-f90rr6yj/stdout.txt
+unlink /home/wilde/SwiftR/run03/swiftwork/rtest-20100902-1723-etxm22pg-f-runr-f90rr6yj/wrapper.log
+unlink /home/wilde/SwiftR/run03/swiftwork/rtest-20100902-1723-etxm22pg-f-runr-f90rr6yj/cb1
+rmdir /home/wilde/SwiftR/run03/swiftwork/rtest-20100902-1723-etxm22pg-f-runr-f90rr6yj
+Terminating worker processes 27297 and starter 27126
+bri$ 

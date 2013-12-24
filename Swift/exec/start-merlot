@@ -1,0 +1,293 @@
+#! /usr/bin/env bash
+
+# Define internal functions
+
+export TRAPEVENTS="EXIT 1 2 3 15"  # Signals and conditions to trap
+
+get-contact()
+{
+  # Look for:
+  # Passive queue processor initialized. Callback URI is http://140.221.8.62:55379
+
+  for try in $(seq 1 20); do
+    uriline=$(grep "Passive queue processor initialized. Callback URI is" $out 2> /dev/null)
+    if [ "_$uriline" = _ ]; then
+      sleep 1
+    else
+      break;
+    fi
+  done
+
+  if [ "_$uriline" = _ ]; then
+    echo "$0: No passive state message from Swift - exiting."
+    exit 1
+  fi
+
+  CONTACT=$(echo $uriline | sed -e 's/^.*http:/http:/')
+  echo Coaster service contact URI: $CONTACT
+}
+
+function wait-and-start-ssh-workers
+{
+  get-contact
+  LOGDIR=$(pwd)/swiftworkerlogs # full path. FIXME: Generate this with remote-side paths if not shared dir env?
+  LOGDIR=/tmp/$USER/SwiftR/swiftworkerlogs  # FIXME: left this in /tmp so it works on any host. Better way?
+
+  #  mkdir -p $LOGDIR # is done with the ssh command, below
+
+  IDLETIMEOUT=$((60*60*240)) # 10 days: FIXME: make this a command line arg
+
+  rm -rf remotepid.* # FIXME: should not be needed if we start in a new dir each time
+  for host in $(echo $hosts); do
+    timestamp=$(date "+%Y.%m%d.%H%M%S")
+    random=$(awk "BEGIN {printf \"%0.5d\", $RANDOM}")
+    ID=$timestamp.$random
+       # FIXME: make logging an argument; set false by default
+       # fixme:send worker.pl to remote host via stdin or scp.
+       ssh $host /bin/sh -c \'"mkdir -p $LOGDIR"\'
+       scp $SWIFTBIN/worker.pl $host:$LOGDIR
+       ssh $host '/bin/sh -c '\'"WORKER_LOGGING_ENABLED=true $LOGDIR/worker.pl $CONTACT $ID $LOGDIR $IDLETIMEOUT 2>&1 & echo PID=\$!"\'  >remotepid.$host </dev/null &
+       sshpids="$sshpids $!"
+  done
+
+  echo Started workers from ssh processes $sshpids
+  echo $sshpids > $sshpidfile
+  wait
+}
+
+make-pbs-submit-file()
+{
+  if [ $queue != default ]; then
+    queueDirective="#PBS -q $queue"
+  else
+    queueDirective=""
+  fi
+cat >pbs.sub <<END
+#PBS -S /bin/sh
+#PBS -N SwiftR-workers
+#PBS -m n
+#PBS -l nodes=$nodes:ppn=$cores
+#PBS -l walltime=$time
+#PBS -o $HOME/mw/work/pbs.stdout
+#PBS -e $HOME/mw/work/pbs.stderr
+$queueDirective
+WORKER_LOGGING_ENABLED=true # FIXME: parameterize; fix w PBS -v
+HOST=\$(echo $CONTACT | sed -e 's,^http://,,' -e 's/:.*//')
+PORT=\$(echo $CONTACT | sed -e 's,^.*:,,')
+CONTACT=http://localhost:\$PORT
+echo '***' PBS_NODEFILE file is \$PBS_NODEFILE
+cat \$PBS_NODEFILE
+echo '***' unique nodes are:
+sort < \$PBS_NODEFILE|uniq
+for h in \$(sort < \$PBS_NODEFILE|uniq); do
+  ssh \$h "echo Swift R startup running on host; hostname; echo HOST=\$HOST PORT=\$PORT CONTACT=\$CONTACT; cd /; ( ssh -N -L \$PORT:\$HOST:\$PORT \$HOST & sleep 3; /usr/bin/perl $SWIFTBIN/worker.pl \$CONTACT SwiftR-\$h $HOME/.globus/coasters $IDLETIMEOUT ; wait)" &
+done
+
+ontrap()
+{
+  echo in ontrap
+  # Kill our processes on each node; do first node (on which this is running) last
+  for h in \$(sort < \$PBS_NODEFILE|uniq | sort -r); do
+    echo killing processes on host \$h
+    ssh \$h killall -u \$USER
+  done;
+  killall -u \$USER
+}
+
+trap ontrap $TRAPEVENTS
+wait
+
+END
+}
+
+function wait-and-start-pbs-workers
+{
+  get-contact
+  LOGDIR=$(pwd)/swiftworkerlogs # full path. FIXME: Generate this with remote-side paths if not shared dir env?
+  LOGDIR=/tmp/$USER/SwiftR/swiftworkerlogs  # FIXME: left this in /tmp so it works on any host. Better way?
+
+  mkdir -p $LOGDIR
+
+  IDLETIMEOUT=$((60*60*240)) # 10 days: FIXME: make this a command line arg
+
+  # FIXME: set up for capturing pbs job id: rm -rf remotepid.* # FIXME: should not be needed if we start in a new dir each time
+  make-pbs-submit-file
+  qsub pbs.sub>$pbsjobidfile
+
+  echo Started workers from PBS job $(cat $pbsjobidfile)
+}
+
+usage()
+{
+  echo >&2 "usage: $0 -c cores -h 'host1 ... hostN' -n nodes -q queue -s server -t throttle"
+  echo >&2 "  valid servers: local, ssh, pbs"
+  echo >&2 "  defaults:  cores=2 nodes=1 queue=none server=local throttle=10"
+}
+
+verify-is-one-of()
+{
+  argname=$1
+  arg=$2
+  shift 2
+  for v in $*; do
+    if [ $arg = $v ]; then
+      return 0
+    fi
+  done
+  echo $0: value for argument $argname was $arg - must be one of: $*
+  usage
+  exit 1
+}
+
+verify-is-numeric()
+{
+  argname=$1; shift
+  if test $1 -ge 0 2>/dev/null; then
+    return 0
+  else
+    echo $0: value for $argname must be a positive integer, was: $1
+    usage
+    exit 1
+  fi
+}
+
+verify-not-null()
+{
+  argname=$1; shift
+  if [ _$1 != _ ]; then
+    return 0
+  else
+    echo $0: value for $argname can not be null
+    usage
+    exit 1
+  fi
+}
+
+# main script
+
+tmp=${SWIFTR_TMP:-/tmp}
+
+# Process command line args
+
+server=local
+time="00:30:00"
+nodes=1
+queue=short
+#throttleOneCore="-0.001"  FIXME: Remove
+#throttleOneCore="0.00"    FIXME: Remove
+localcores=5
+cores=0
+defaultCores=4
+throttle=10
+hosts=no-hosts-specified
+queue=default
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -c) cores=$2; verify-is-numeric cores $cores; shift ;;
+    -h) hosts=$2; verify-not-null hosts $hosts; shift ;; 
+    -n) nodes=$2; verify-is-numeric nodes $nodes; shift ;;
+    -p) throttle=$2; verify-is-numeric throttle $throttle; shift ;;
+    -q) queue=$2; verify-not-null queue $queue; shift ;;
+    -s) server=$2; verify-is-one-of server $server local ssh pbs; shift ;;
+    -t) time=$2; verify-is-not-null time $time; shift ;;
+    *)  usage; exit 1 ;;
+  esac
+  shift
+done
+
+echo cores=$cores nodes=$nodes queue=$queue server=$server throttle=$throttle
+
+SWIFTRBIN=$(cd $(dirname $0); pwd)
+SWIFTBIN=$SWIFTRBIN/../swift/bin  # This depends on ~/SwiftR/Swift/swift being a symlink to swift in RLibrary/Swift
+
+rundir=$tmp/$USER/SwiftR/swift.$server  # rundir prefix # FIXME: handle multiple concurent independent swift servers per user
+mkdir -p $(dirname $rundir)
+trundir=$(mktemp -d $rundir.XXXX) # FIXME: check success
+rm -rf $rundir
+ln -s $trundir $rundir
+cd $rundir
+
+echo Running in $trundir "(linked to $rundir)"
+
+script=$SWIFTRBIN/rserver.swift
+#cp $script $SWIFTRBIN/passive-coaster-swift $SWIFTRBIN/swift.properties $rundir
+cp $script .
+script=$(basename $script)
+cp $SWIFTRBIN/{EvalRBatchPersistent.sh,SwiftRServer.R} .
+
+# DONE: FIXME: rework this script to transfer all shells and rscripts
+# needed, and to copy in the R prelude for the R server processes (to
+# include for example the OpenMx library)  NOTE: Both were done in older version of this script.
+
+# rm -f requestpipe resultpipe
+mkfifo requestpipe resultpipe
+
+out=swift.stdouterr
+touch $out
+
+if [ $server = local ]; then
+
+  source $SWIFTRBIN/configure-server-local $cores
+
+elif [ $server = ssh ]; then
+
+  if [ $cores -eq 0 ]; then
+    cores = $defaultRemoteCores
+  fi
+
+  source $SWIFTRBIN/configure-server-ssh $cores $time
+
+  sshpidfile=${out/stdouterr/workerpids}
+
+  function onexit {
+    coasterservicepid="" # null: saved in case we go back to using coaster servers
+    trap - $TRAPEVENTS
+    sshpids=$(cat $sshpidfile)
+    echo Terminating worker processes $sshpids, starter $starterpid
+    for rpfile in $(ls -1 remotepid.*); do
+      rpid=$(grep PID= $rpfile | sed -e 's/PID=//')
+      rhost=$(echo $rpfile | sed -e 's/remotepid.//')
+      echo Based on $rpfile: terminating process group of process $rpid on $rhost
+      ssh $rhost sh -c \''PGID=$(ps -p '$rpid' -o pgid --no-headers|sed -e "s/ //g"); kill -s TERM -- -$PGID'\'
+    done
+    if [ "_$sshpids$starterpid$coasterservicepid" != _ ]; then
+      echo kill $sshpids $starterpid $coasterservicepid >& /dev/null
+    fi
+    kill 0 # Kill all procs in current process group # FIXME: what was this for????
+  }
+
+  trap onexit $TRAPEVENTS
+
+  wait-and-start-ssh-workers &
+  starterpid=$!
+
+elif [ $server = pbs ]; then
+
+  source $SWIFTRBIN/configure-server-pbs $cores
+
+  pbsjobidfile=${out/stdouterr/pbsjobid}
+
+  function onexit {
+    coasterservicepid="" # null: saved in case we go back to using coaster servers
+    trap - $TRAPEVENTS
+    pbsjobid=$(cat $pbsjobidfile)
+    echo Terminating worker processes starter $starterpid and PBS job $pbsjobid
+    if [ "_$starterpid != _ ]; then
+      kill $starterpid
+    fi
+    if [ "_$pbsjobid != _ ]; then
+      qdel $pbsjobid
+    fi
+    kill 0 # Kill all procs in current process group # FIXME: what was this for????
+  }
+
+  trap onexit $TRAPEVENTS
+
+  wait-and-start-pbs-workers &
+  starterpid=$!
+
+fi
+
+$SWIFTRBIN/../swift/bin/swift -config cf -tc.file tc -sites.file sites.xml $script -pipedir=$(pwd) >& $out </dev/null

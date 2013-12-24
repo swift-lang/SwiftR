@@ -1,0 +1,72 @@
+#! /usr/bin/env bash
+
+COMPUTEHOSTS=$1
+#  COMPUTEHOSTS='crush thwomp stomp crank steamroller grind churn trounce thrash vanquish'
+#  COMPUTEHOSTS='communicado'
+
+shift
+
+SWIFTRBIN=$(cd $(dirname $0); pwd)
+
+function wait-and-start-workers
+{
+  # Look for:
+  # Passive queue processor initialized. Callback URI is http://140.221.8.62:55379
+
+  for try in $(seq 1 20); do
+    uriline=$(grep "Passive queue processor initialized. Callback URI is" $out 2> /dev/null)
+    if [ "_$uriline" = _ ]; then
+      sleep 1
+    else
+      break;
+    fi
+  done
+  CONTACT=$(echo $uriline | sed -e 's/^.*http:/http:/')
+  echo Coaster contact: $CONTACT
+
+  LOGDIR=$(pwd)/swiftworkerlogs # full path. FIXME: Generate this with remote-side paths if not shared dir env?
+  mkdir -p $LOGDIR
+
+  workerscript=$SWIFTRBIN/worker.pl # FIXME: Try to send this inline or via scp; cp from exec/ dir
+  # CA="X509_CERT_DIR=$CERTDIR X509_CADIR=$CERTDIR"
+  for host in $(echo $COMPUTEHOSTS); do
+    timestamp=$(date "+%Y.%m%d.%H%M%S")
+    random=$(awk "BEGIN {printf \"%0.5d\", $RANDOM}")
+    ID=$timestamp.$random
+    ssh $host WORKER_LOGGING_ENABLED=true $workerscript $CONTACT $ID $LOGDIR &
+    sshpids="$sshpids $!"
+  done
+
+  echo Started workers from these ssh processes: $sshpids
+  echo $sshpids > $sshpidfile
+  # ps $sshpids
+}
+
+if ! which swift >& /dev/null; then
+  echo $0: \'swift\' command not found in PATH
+  exit 1
+fi
+
+out=`mktemp -t swift.stdouterr.XXXX`
+touch $out
+sshpidfile=${out/stdouterr/workerpids}
+
+echo swift output is in: $out, pids in $sshpidfile
+
+TRAPS="EXIT 1 2 3 15"  # Signals and conditions to trap
+
+function onexit {
+  trap - $TRAPS
+  sshpids=$(cat $sshpidfile)
+  echo "Terminating worker processes $sshpids and starter $starterpid"
+  if [ "_$sshpids$starterpid" != _ ]; then
+    kill $sshpids $starterpid >& /dev/null
+  fi
+}
+
+trap onexit $TRAPS
+
+wait-and-start-workers &
+starterpid=$!
+
+swift $* 2>&1 | tee $out

@@ -1,0 +1,19 @@
+#! /usr/bin/env bash
+
+tokill=$1
+while [ ! -z $tokill ]
+do
+    children=""
+    for pid in $tokill
+    do
+        #echo $pid
+        newkids=`ps h -o pid --ppid $pid`
+        if [ ! -z $newkids ]
+        then
+            children="$children $newkids"
+        fi 
+        #echo kids $children
+        kill $pid &> /dev/null
+    done
+    tokill=$children
+done

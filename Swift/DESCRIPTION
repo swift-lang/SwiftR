@@ -1,0 +1,13 @@
+Package: Swift
+Type: Package
+Title: R interface to Swift parallel scripting languaage
+Version: 0.3.4
+Date: 2012-01-30
+Author: Michael Wilde
+Maintainer: Michael Wilde <wilde@mcs.anl.gov>
+Depends: R (>= 2.11)
+SystemRequirements: Perl (>= 5.10.0), Java (>= 1.6), bash
+Description: Routines to invoke R functions on remote resources through Swift.
+License: Apache License
+LazyLoad: yes
+Packaged: 2012-01-30; Tim Armstrong

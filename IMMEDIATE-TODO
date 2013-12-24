@@ -1,0 +1,212 @@
+
+HIGH:
+-- OpenMx Benchmarking on Beagle
+
+HIGH:
+-- sometimes the server crashes after servicing first request(
+    only observed when running locally and on sge)
+
+HIGH:
+-- Merge canonical portions of wiki documentation into R man pages
+-- Generate html from R man pages
+
+HIGH:
+-- Benchmark ideas
+    - Beagle
+    - Sarah Kenny FMRI
+3) speed: where is bottleneck?  how to measure and tune?
+- ParallelCI and ParallelBoostrap benchmarks
+- smaller focused micro-tests to create plots of speed vs param size and efficiency vs runtime of the evaluated function.
+
+
+MED: 
+-- Have a more user-friendly way to specify some of the more common
+    custom setups:
+    - PBS with Dynamic submission of jobs of various lengths
+        * Done: pbsauto
+        * This needs to be tested a bit more on other setups
+
+    -   other batch schedulers
+
+    This involves specifying
+    - job walltimes
+    - queue
+    - staging mechanism
+    - etc
+    We also need robust defaults
+
+MED:
+-- Feedback from queue to let user know if job waiting in batch queue
+
+HIGH:
+-- better ctrl-c support
+    -- How to abort swiftapply call once started without bringing down
+        cluster?
+
+HIGH:
+-- Usability testing package
+-- Instructions + survey
+
+MED:
+-- Support generic swift sites.xml and tc.data files for power users
+-- Note: support is added, but need to consider either:
+    a) guidelines for how to write the file
+    b) templates or auto-generation.
+
+MED:
+-- automated tests
+
+MED:
+-- IBI performance tests
+
+MED:
+-- Add OpenMx tests to SwiftR test suite
+
+MID:
+- test on Ranger
+
+MID:
+-- Check  java version ahead of time
+
+MID:
+- Support Swift mode where it runs multiple batch jobs to avoid timeout
+    issues and congestion issues
+
+ 
+MID:
+- SGE for Tim bates
+ -- ranger -- needs accounts
+ -- ibi
+ -- siraf
+ -- godzilla (if updated)
+
+MED:
+- sockets to improve performance?
+
+MID:
+* Cleanup ssh worker processes: add a watchdog that detects when worker.pl has 
+    gone away
+
+MID:
+* monitor batch jobs to make sure they launch ok and keep the user in the loop
+* restart batch jobs automatically if time runs out
+
+MID:
+Implement omxXXX parallel calls that behave same on swift, snowfall, local:
+    * omxExport
+    * omxApply
+    * omxLibrary
+    * etc
+    * update openmx code
+    * add tests to openmx
+* Detect in OpenMx whether swift cluster is initialized.
+
+MED:
+
+Coaster timeout problem:
+    * Relevant bug: https://bugzilla.mcs.anl.gov/swift/show_bug.cgi?id=253
+    * Temporary fix (increasing timeout duration) integrated into provider-coaster/src/org/globus/cog/abstraction/coaster/service/CoasterService.java
+    * Don't want to have to hardcode change:
+
+MID:
+- More robust mechanism for swiftExport
+    - Write all needed files into request directory (symlink?),
+        then map with swift and use swift to stage?
+- mechanism to copy other files across directly
+
+LOW:
+ -- Plyr support
+ -- foreach support
+ -- raster support
+LOW: (unless needed by immediate OpenMx app or test)
+- complete sf compat functions (sapply, lapply -> for openMx, based on usage)
+
+LOW:
+- run modes
+ -- workspace stays up, server(s) are transient-> current
+    ?? Protocol:
+      - SwiftR detects that there is a job still runing, doesn't
+        shut down server on exit
+      - SwiftR removes result pipe
+      - Swift script writes a done message to result directory
+        and then exits loop
+
+LOW: 
+-- perf issue wrt arg list copies (very low prio)
+
+LOW:
+- Batch option: number of jobs
+
+LOW:
+ idea:
+* swiftInit() should wait until batch job is submitted successfully, or
+    at least one ssh client starts correctly
+
+LOW:
+* swiftStat to check state of worker processes
+
+LOW:
+* feasibility of multithreaded server:
+    - each request provides a reply channel
+    - swift server forks off a worker thread for
+        each request
+LOW:
+Investigate use of swift broadcase:
+    swift bcast if exportAll files/data and/or xmit this via prov staging w/ caching of duplicates
+
+LOW:
+- saner approach to channels: channel per request to avoid the issue
+    of what happens if a "done" is never read
+
+=========================================================================
+Completed:
+=========================================================================
+HIGH:
+-- Test pbsf (on PADS?)
+
+HIGH:
+-- Check job throttling setting
+* Turn off bashrc processing, etc shell script
+
+HIGH:
+in swift.properties we should make sure we dont return info logs we should make sure that the amount of logging on both the worker side and the client side is as low as it can go
+
+HIGH:
+ Look at all OmxNNN parallel calls - see if any are used that we dont yet handle.
+ - It turns out that they are not currently needed
+
+        
+
+MID:
+- user testing in general (ssh, pbs, sge) 
+* SGE testing: ranger, siraf (low priority)
+
+LOW:
+ - workspace is run as a job under batch scheduler -> new feature
+ (* This can be achieved by running R script through batch scheduler, and using
+ ssh server.  A convenience function getNodeList is included to make it easier
+ to get the host list from the environment *)
+
+MID:
+- startup notes from Tim Bates
+ -- rlib rpackage sugg   
+
+VERY HIGH:
+-- Streamlined tutorial for Multicore:
+    * Simple page with nothing aside from R commands for simplest case
+    * link to installation instructions
+    * link to advanced info
+
+VERY HIGH:
+-- OpenMx doco on wiki
+HIGH:
+-- Benchmark ideas
+    Timing: dramatic bencmark results for new proposal.
+    - Parallel bootstrap DONE
+    - Parallel CI
+    - smaller focused micro-tests looking at param size
+    - Sarah Kenny FMRI
+    - parallel OpenMx Tests
+
+HIGH:
+-- Test on Mac

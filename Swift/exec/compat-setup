@@ -1,0 +1,19 @@
+#! /usr/bin/env bash
+# sets variables to handle compatibility issues
+
+if [ -f "`which seq 2> /dev/null`" ] 
+then
+    SEQ=seq
+else
+    SEQ="jot -"
+fi
+
+if [ -f "`mktemp 2> /dev/null`" ]; then
+    MKTEMP=mktemp
+elif [ -f "`mktemp -t swiftR 2> /dev/null`" ]; then
+    # mac OS
+    MKTEMP="mktemp -t swiftR"
+else
+    echo Could not find valid mktemp, exiting
+    exit 1
+fi

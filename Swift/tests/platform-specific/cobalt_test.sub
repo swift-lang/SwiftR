@@ -1,0 +1,12 @@
+#!/bin/sh
+export WORKER_LOGGING_LEVEL=ERROR
+echo '***' COBALT_NODEFILE file: $COBALT_NODEFILE 
+cat $COBALT_NODEFILE
+echo '***' unique nodes are:
+sort < $COBALT_NODEFILE|uniq
+
+echo GLOBUS_HOSTNAME $GLOBUS_HOSTNAME
+export GLOBUS_HOSTNAME=""
+Rscript `dirname $0`/batch_test.R cobalt
+
+

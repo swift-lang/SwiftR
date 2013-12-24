@@ -1,0 +1,56 @@
+#! /usr/bin/env bash
+# This script is intended as a helper script to let
+# R launch start-swift.  It works around the limitations
+# of the R system command, which cannot retrieve
+# the process id of the child process.
+# This script forks off a child process, detaches it
+# and then, as the only thing written to stdout, echoes
+# the pid of start-swift
+ssscript=`dirname $0`/start-swift
+
+# Choose a working directory
+tmp=${SWIFTR_TMP:-/tmp}
+
+topdir=$tmp/$USER/SwiftR
+
+if mkdir -p $topdir 2> /dev/null ; then
+    :
+else
+    topdir=$(mktemp -d $tmp/SwiftR.XXXXXX)
+    created_ok=$?
+    if [ $created_ok -ne 0 ]; then
+        echo "Could not create temporary directory under $tmp"
+        exit 1
+    fi
+fi
+
+workdir=$(mktemp -d $topdir/swift.XXXX) 
+
+ackfifo=$workdir/ackfifo
+mkfifo $ackfifo
+
+if [ "$?" != "0" ]
+then
+    echo "Could not create temporary directory under $topdir"
+    exit 1
+fi
+
+# Start as detached daemon, with output going to stderr
+# Start up a subprocess with a new process group
+# childpid will be of form '[jobno] pid'
+$ssscript "$@" -d $workdir 1>&2 &
+childpid=$!
+
+echo ${childpid}
+echo ${workdir}
+
+# Wait for subprocess to let us know its ready
+res=`cat $ackfifo`
+rm $ackfifo
+if [ "$res" = ok ]; then
+    echo $res
+    exit 0;
+else
+    echo $res
+    exit 1
+fi

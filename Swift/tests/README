@@ -1,0 +1,7 @@
+perf/
+  Tests used to gather performance measurements
+platform-specific/
+  Tests which need to be run in a specific environment (e.g. on a cluster
+  or on the head node of a cluster with a particular scheduler)
+OpenMx
+  Benchmarks and tests using the OpenMx package

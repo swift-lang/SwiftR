@@ -1,0 +1,16 @@
+export(swiftapply)
+export(swiftLapply)
+export(swiftSapply)
+export(swiftInit)
+export(getNodeList)
+export(swiftShutdown)
+export(swiftLibrary)
+export(swiftDetach)
+export(swiftDetachAll)
+
+export(swiftExport)
+export(swiftExportAll)
+export(swiftRemoveAll)
+
+export(basicSwiftTest)
+export(runAllSwiftTests)

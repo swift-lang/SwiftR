@@ -1,0 +1,18 @@
+# Variables shared between makefiles
+
+# Use 0.92.1 release
+#SWIFT_SRC_TAG = tags/release-0.92.1
+#COG_SRC_TAG = tags/swift_0.92.1
+#SWIFT_SRC_NAME = swift-0.92.1-SwiftR-r2
+
+# Use 0.93 release candidate
+#SWIFT_SRC_TAG = branches/release-0.93
+#COG_SRC_TAG = branches/4.1.9/src/cog
+#SWIFT_SRC_NAME = swift-0.93-SwiftR-r1
+
+# Use 0.93 release
+SWIFT_SRC_TAG = tags/release-0.93
+COG_SRC_TAG = tags/swift-0.93/src/cog
+SWIFT_SRC_NAME = swift-0.93-SwiftR-r2
+
+SWIFT_SRC_PATCH = swift-0.92.1-changes.patch

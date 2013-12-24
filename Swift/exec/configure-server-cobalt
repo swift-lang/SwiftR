@@ -1,0 +1,38 @@
+#! /usr/bin/env bash
+
+# configuration for cobalt with manually-started Swift workers (passive coasters)
+
+cat >tc <<END
+cobalt       bash      /bin/bash null null ENV::PATH="$PATH";GLOBUS::maxwalltime="00:01:00"
+END
+
+
+cat >sites.xml <<END
+<config>
+  <pool handle="cobalt">
+    <execution provider="coaster" url="none" jobmanager="local:NA"/>
+    <profile namespace="globus" key="workerManager">passive</profile>
+    <profile namespace="globus" key="workersPerNode">$cores</profile>
+    <profile namespace="karajan" key="jobThrottle">$throttle</profile>
+    <profile namespace="karajan" key="initialScore">10000</profile>
+    <profile namespace="env" key="R_LIBS_USER">$R_LIBS_USER</profile>
+    <filesystem provider="local" url="none"/>
+    <workdirectory>$(pwd)/swiftwork</workdirectory>
+    <scratch>$(pwd)/swiftscratch</scratch>
+  </pool>
+
+</config>
+END
+
+cat >cf <<END
+wrapperlog.always.transfer=false
+sitedir.keep=false
+execution.retries=$num_retries
+lazy.errors=false
+status.mode=provider
+use.provider.staging=true
+provider.staging.pin.swiftfiles=true
+#throttle.host.submit=1
+END
+
+

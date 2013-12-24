@@ -1,0 +1,2 @@
+fork      bashlocal /bin/bash null null null
+pbs       bash      /bin/bash null null GLOBUS::maxwalltime="0:55:00"

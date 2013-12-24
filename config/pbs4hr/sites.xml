@@ -1,0 +1,21 @@
+<config>
+
+<pool handle="pbs">
+    <execution provider="coaster" url="none" jobManager="local:pbs"/>
+    <!-- maxTime specifies the maximum duration of a pbs reservation -->
+    <!-- maxWallTime in the tc file specifies the maximum time that
+        task is expected to run for.  Multiple tasks will be fit into
+        a pbs reservation if possible -->
+    <profile namespace="globus" key="maxTime">14400</profile>
+    <profile namespace="globus" key="workersPerNode">1</profile>
+    <profile namespace="globus" key="slots">128</profile>
+    <profile namespace="globus" key="nodeGranularity">1</profile>
+    <profile namespace="globus" key="maxNodes">1</profile>
+    <profile namespace="karajan" key="jobThrottle">1.27</profile> <!--128 concurrent tasks-->
+    <profile namespace="karajan" key="initialScore">10000</profile>
+    <profile namespace="globus" key="queue">short</profile> 
+    <scratch>/scratch/local/tga</scratch>
+    <filesystem provider="local"/>
+    <workdirectory>/gpfs/pads/scratch/tga</workdirectory>
+  </pool>
+</config>

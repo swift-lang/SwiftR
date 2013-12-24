@@ -1,0 +1,65 @@
+
+SHORT-TERM GOALS
+---------------
+* Stable on the following platforms:
+    - SGE
+    - Local multi-core
+    - PBS
+    - SSH
+* Working on the following platforms for development use:
+    - Cobalt
+    - Slurm
+* Speed competitive with Snowfall on basic tasks
+
+
+TEST SUITE
+-----------
+1. get and try openmx examples
+2. look at openmx test examples for test structure conventions
+3. Test cleanup
+4. performance tests (compare with Snowfall)
+    - vary durations, batching, and target environs
+    - vary input and output sizes
+    - plot performance surfaces
+
+
+MANUAL TESTING
+--------------
+1. test on local, ssh, pbs (then SGE)
+    - need SGE accounts for Tim
+2. test fast branch
+
+PERFORMANCE OPTIMISATION
+------------------------
+1. increase speed on basic per tests
+
+ARCHITECTURAL CHANGES
+--------------------------
+1. add readSocket/writeSocket function to swift
+2. replace clienr-R-to-rserver.swift fifo with socket
+3. replace worker.pl-to-appScript.sh-to-serverR fifo with socket (later?)
+4.  consider karajan instead of swift program (discuss w/ Mihael and Allan)
+
+MISC SWIFTR ISSUES
+------------------
+* replace ack with fprintf
+
+MISC SWIFT ISSUES
+----------
+- coaster service & worker timeout - disable
+- use fprintf()
+- test fast branch
+- eval raw swift and worker speed
+
+
+BACKGROUND - TIM
+----------------
+1. Read OpenMX Paper, Wiki
+
+ADMIN - TIM
+----------
+* SGE accounts
+    -Get acct on IBI cluster - ci support
+    - apply for TeraGrid account to test on Ranger SGE system
+    - Eureka account
+

@@ -1,0 +1,262 @@
+#! /usr/bin/env bash
+
+SWIFTRBIN=$(cd $(dirname $0); pwd)
+
+serviceport=1985
+
+#rundir=/tmp/SwiftR/swiftserver
+rundir=/tmp/$USER/SwiftR/swiftserver # FIXME: handle multiple concurent independent swift servers per user
+#site=local
+
+location=$1
+stagingmethod=$2
+
+script=$SWIFTRBIN/rserver.swift
+
+trundir=$(mktemp -d $rundir.XXXX)
+mkdir -p $trundir
+rm -rf $rundir
+ln -s $trundir $rundir
+
+cp $script $SWIFTRBIN/passive-coaster-swift $SWIFTRBIN/swift.properties $rundir
+
+# FIXME: rework this script to transfer all shells and rscripts
+# needed, and to copy in the R prelude for the R server processes (to
+# incude for example the OpenMx library)
+
+cd $rundir
+
+rm -f requestpipe resultpipe
+mkfifo requestpipe resultpipe
+
+# FIXME: how to get the right PATH for R in here?
+# use /bin/sh and count on users PATH?
+# then add ENV::PATH as an option, e.g., from options(swift.remotepath and swift.remotepath.sitename)
+
+app=/bin/bash
+
+cat >tc <<END
+#$site bash${site} $app null null null
+local  bashlocal  /bin/bash null null ENV::PATH="$PATH"
+remote bashremote /bin/bash null null ENV::PATH="$PATH"
+service bashservice /bin/bash null null ENV::PATH="$PATH"
+fork   bash       /bin/bash null null null
+END
+
+if [ $stagingmethod = local-staging ]; then
+
+cat >sites.xml <<END
+<config>
+
+  <pool handle="default">
+    <execution provider="coaster-persistent" url="http://localhost" jobmanager=""/>
+    <profile namespace="globus" key="workerManager">passive</profile>
+    <profile namespace="globus" key="workersPerNode">4</profile> <!-- FIXME: make these settable -->
+    <profile key="jobThrottle" namespace="karajan">.03</profile>
+    <profile namespace="karajan" key="initialScore">10000</profile>
+    <filesystem provider="local" url="none" />
+    <workdirectory>$HOME/swiftwork</workdirectory>
+  </pool>
+
+  <pool handle="local">
+    <execution provider="coaster" url="http://localhost" jobmanager="local:local"/>
+    <profile namespace="globus" key="workersPerNode">4</profile> <!-- FIXME: make these settable -->
+    <profile key="jobThrottle" namespace="karajan">.03</profile>
+    <profile namespace="karajan" key="initialScore">10000</profile>
+#    <filesystem provider="local" url="none" />
+    <profile namespace="swift" key="stagingMethod">file</profile>
+    <workdirectory>/tmp/$USER/SwiftR/swiftserver</workdirectory>
+  </pool>
+
+  <pool handle="fork">
+    <execution provider="local" url="none" />
+    <profile namespace="karajan" key="initialScore">10000</profile>
+    <profile namespace="karajan" key="jobThrottle">.03</profile>
+    <filesystem provider="local"/>
+    <workdirectory>/tmp/$USER/SwiftR/swiftserver</workdirectory>
+  </pool>
+
+  <pool handle="passive">
+    <execution provider="coaster" url="none" jobmanager="local:local"/>
+    <profile namespace="globus" key="workerManager">passive</profile> 
+    <profile namespace="globus" key="workersPerNode">8</profile>
+    <profile key="jobThrottle" namespace="karajan">.07</profile>
+    <profile namespace="karajan" key="initialScore">10000</profile>
+    <filesystem provider="local" url="none" />
+    <workdirectory>/$HOME/swiftwork</workdirectory>
+  </pool>
+
+  <pool handle="service">
+    <execution provider="coaster-persistent" url="http://$(hostname -f):${serviceport}" jobmanager=""/>
+    <profile namespace="globus" key="workerManager">passive</profile>
+    <profile namespace="globus" key="workersPerNode">4</profile> <!-- FIXME: make these settable -->
+    <profile key="jobThrottle" namespace="karajan">.03</profile>
+    <profile namespace="karajan" key="initialScore">10000</profile>
+    <filesystem provider="local" url="none" />
+    <workdirectory>/$HOME/swiftwork</workdirectory>
+  </pool>
+
+  <pool handle="pbs">
+    <profile namespace="globus" key="maxwalltime">00:00:10</profile>
+    <profile namespace="globus" key="maxtime">1800</profile>
+    <execution provider="coaster" url="none" jobManager="local:pbs"/>
+    <profile namespace="globus" key="workersPerNode">1</profile>
+    <profile namespace="karajan" key="initialScore">10000</profile>
+    <profile namespace="karajan" key="jobThrottle">5.99</profile>
+    <filesystem provider="local"/>
+    <workdirectory>/$HOME/swiftwork</workdirectory>
+  </pool>
+
+</config>
+END
+
+cat >cf <<END
+wrapperlog.always.transfer=true
+sitedir.keep=true
+execution.retries=0
+lazy.errors=false
+status.mode=provider
+use.provider.staging=false
+#provider.staging.pin.swiftfiles=false
+END
+
+elif [ $stagingmethod = provider-staging ]; then
+
+cat >sites.xml <<END
+<config>
+
+  <pool handle="default">
+    <execution provider="coaster-persistent" url="http://localhost" jobmanager=""/>
+    <profile namespace="globus" key="workerManager">passive</profile>
+    <profile namespace="globus" key="workersPerNode">4</profile> <!-- FIXME: make these settable -->
+    <profile key="jobThrottle" namespace="karajan">.03</profile>
+    <profile namespace="karajan" key="initialScore">10000</profile>
+    <filesystem provider="local" url="none" />
+    <workdirectory>$rundir/swiftwork</workdirectory>
+  </pool>
+
+  <pool handle="local">
+    <execution provider="coaster" url="http://localhost" jobmanager="local:local"/>
+    <profile namespace="globus" key="workersPerNode">4</profile> <!-- FIXME: make these settable -->
+    <profile key="jobThrottle" namespace="karajan">.03</profile>
+    <profile namespace="karajan" key="initialScore">10000</profile>
+#    <filesystem provider="local" url="none" />
+    <profile namespace="swift" key="stagingMethod">file</profile>
+    <workdirectory>/tmp/$USER/SwiftR/swiftserver</workdirectory>
+  </pool>
+
+  <pool handle="fork">
+    <execution provider="local" url="none" />
+    <profile namespace="karajan" key="initialScore">10000</profile>
+    <profile namespace="karajan" key="jobThrottle">.03</profile>
+    <profile namespace="swift" key="stagingMethod">file</profile>
+    <workdirectory>/tmp/$USER/SwiftR/swiftserver</workdirectory>
+  </pool>
+
+  <pool handle="OLDfork">
+    <execution provider="local" url="none" />
+    <profile namespace="karajan" key="initialScore">10000</profile>
+    <profile namespace="karajan" key="jobThrottle">.03</profile>
+    <filesystem provider="local"/>
+    <workdirectory>/tmp/$USER/SwiftR/swiftserver</workdirectory>
+  </pool>
+
+  <pool handle="passive">
+    <execution provider="coaster" url="none" jobmanager="local:local"/>
+    <profile namespace="globus" key="workerManager">passive</profile> 
+    <profile namespace="globus" key="workersPerNode">8</profile>
+    <profile key="jobThrottle" namespace="karajan">.07</profile>
+    <profile namespace="karajan" key="initialScore">10000</profile>
+    <filesystem provider="local" url="none" />
+    <workdirectory>$HOME/swiftwork</workdirectory>
+  </pool>
+
+  <pool handle="service">
+    <execution provider="coaster-persistent" url="http://$(hostname -f):1985" jobmanager=""/>
+    <profile namespace="globus" key="workerManager">passive</profile>
+    <profile namespace="globus" key="workersPerNode">4</profile> <!-- FIXME: make these settable -->
+    <profile key="jobThrottle" namespace="karajan">.03</profile>
+    <profile namespace="karajan" key="initialScore">10000</profile>
+    <profile namespace="swift" key="stagingMethod">proxy</profile>
+    <workdirectory>/tmp/$USER/SwiftR/swiftwork</workdirectory>
+  </pool>
+
+  <pool handle="OLDservice">
+    <execution provider="coaster-persistent" url="http://localhost" jobmanager=""/>
+    <profile namespace="globus" key="workerManager">passive</profile>
+    <profile namespace="globus" key="workersPerNode">4</profile> <!-- FIXME: make these settable -->
+    <profile key="jobThrottle" namespace="karajan">.03</profile>
+    <profile namespace="karajan" key="initialScore">10000</profile>
+    <filesystem provider="local" url="none" />
+    <workdirectory>/$HOME/swiftwork</workdirectory>
+  </pool>
+
+  <pool handle="pbs">
+    <profile namespace="globus" key="maxwalltime">00:00:10</profile>
+    <profile namespace="globus" key="maxtime">1800</profile>
+    <execution provider="coaster" url="none" jobManager="local:pbs"/>
+    <profile namespace="globus" key="workersPerNode">1</profile>
+    <profile namespace="karajan" key="initialScore">10000</profile>
+    <profile namespace="karajan" key="jobThrottle">5.99</profile>
+    <filesystem provider="local"/>
+    <workdirectory>$HOME/swiftwork</workdirectory>
+  </pool>
+
+</config>
+END
+
+cat >cf <<END
+wrapperlog.always.transfer=true
+sitedir.keep=true
+execution.retries=0
+lazy.errors=false
+status.mode=provider
+#use.provider.staging=false
+use.provider.staging=true
+provider.staging.pin.swiftfiles=false
+END
+
+fi
+
+cp $SWIFTRBIN/{EvalRBatchPersistent.sh,SwiftRServer.R} .
+
+script=$(basename $script)
+
+# $SWIFTRBIN/../swift/bin/swift -config swift.properties -tc.file tc -sites.file sites.xml $script -pipedir=$(pwd) -location=$location >& swift.stdouterr </dev/null
+
+$SWIFTRBIN/../swift/bin/swift -config cf -tc.file tc -sites.file sites.xml $script -pipedir=$(pwd) -location=$location >& swift.stdouterr </dev/null
+
+exit
+
+
+
+
+
+
+
+#### FOSSIL CODE: 
+
+if [ _$site = _passive ]; then
+    ./passive-coaster-swift "$workerhosts" -tc.file tc -sites.file sites.xml $script
+else
+    swift -config swift.properties -tc.file tc -sites.file sites.xml $script >& swift.stdouterr </dev/null
+fi
+
+exit # FIXME: for debugging: remove fossil code below when no longer needed for reference
+
+# FIXME: for reference
+
+if [ _$site = _passive ]; then
+    swiftcmd=./passive-coaster-swift
+    # workhosts passed in as argument
+else
+    swiftcmd=swift
+    workerhosts=""
+fi
+
+script=$(basename $script)
+$swiftcmd "$workerhosts" -tc.file tc -sites.file sites.xml $script
+
+exit 
+
+## swift -tc.file tc -sites.file sites.xml rserver.swift

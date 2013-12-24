@@ -1,0 +1,8 @@
+wrapperlog.always.transfer=false
+sitedir.keep=false
+execution.retries=0
+lazy.errors=false
+status.mode=provider
+use.provider.staging=false
+provider.staging.pin.swiftfiles=false
+#throttle.host.submit=1

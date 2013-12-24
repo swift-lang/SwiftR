@@ -1,0 +1,39 @@
+#! /usr/bin/env bash
+
+# configuration for PBS with manually-started Swift workers (passive coasters)
+
+cat >tc <<END
+pbs       bash      /bin/bash null null ENV::PATH="$PATH";GLOBUS::maxwalltime="00:01:00"
+END
+
+# FIXME: examine effect of 1-min default maxwalltime above
+# FIXME: determine best value for throttle below
+
+cat >sites.xml <<END
+<config>
+  <pool handle="pbs">
+    <execution provider="coaster" url="none" jobmanager="local:NA"/>
+    <profile namespace="globus" key="workerManager">passive</profile>
+    <profile namespace="globus" key="workersPerNode">$cores</profile>
+    <profile namespace="karajan" key="jobThrottle">$throttle</profile>
+    <profile namespace="karajan" key="initialScore">10000</profile>
+    <filesystem provider="local" url="none"/>
+    <profile namespace="env" key="R_LIBS_USER">$R_LIBS_USER</profile>
+    <workdirectory>$(pwd)/swiftwork</workdirectory>
+    <scratch>$(pwd)/swiftscratch</scratch>
+  </pool>
+
+</config>
+END
+
+cat >cf <<END
+wrapperlog.always.transfer=false
+sitedir.keep=false
+execution.retries=$num_retries
+lazy.errors=false
+status.mode=provider
+use.provider.staging=true
+provider.staging.pin.swiftfiles=true
+#throttle.host.submit=1
+END
+

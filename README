@@ -1,0 +1,162 @@
+TIPS AND REMINDERS FOR THE FORGETFUL DEVELOPER :)
+
+
+* NOTES on where everything lives:
+
+Am testing on PADS
+
+   ~/SwiftR is my "project" main working dir
+
+R is under ~/R and ~/R/pads (compiled for PADS; the ~/R/bin/R
+executable gets a library error on pads)
+
+To build R:
+  http://cran.r-project.org/src/base/R-2/R-2.11.1.tar.gz (or desired release)
+  tar zxf *gz
+  cd ddd
+  ./configure --prefix=/home/wilde/R/R-2.11.0
+  make
+  make install
+
+Need to put the right R in the PATH for building and testing.
+Using R 2.11 as of 2010.0903
+
+OpenMx source tree checked out under: ~/OpenMx
+working in .../trunk
+~/SwiftR/OpenMx is a fossil and should be moved and then removed (when certain)
+
+test under: trunk/demo
+source("ParallelBootrapDemo")
+...  FIXME ^^^
+
+Repo is: https://svn.ci.uchicago.edu/svn/vdl2/SwiftApps/SwiftR
+
+R packages are installed under: ~/RPackages
+(These are the release-independent packages?
+FIXME: how does this relate to packages under the current R relesae?
+
+#-----
+bri$ pwd
+/home/wilde/R/R-2.11.0
+bri$ cd library/
+bri$ pwd
+/home/wilde/R/R-2.11.0/library
+bri$ ls 
+KernSmooth/  OpenMx/  base/   cluster/    foreign/    grid/     mgcv/  rpart/    stats/     tcltk/
+MASS/        R.css    boot/   codetools/  grDevices/  lattice/  nlme/  spatial/  stats4/    tools/
+Matrix/      Swift/   class/  datasets/   graphics/   methods/  nnet/  splines/  survival/  utils/
+bri$ 
+#-----
+
+* Note: dont yet know if we do or do not need separate compiles between
+communicado, bridled, pads. teraport, and other systems on the CI
+net. Hopefully not; if we do, weill need to create a tree to R
+releases each with a separate subtree for user-installed packages)
+Seems that we do, at least for PADS, we get this error:
+
+login1$ ~/R/bin/R
+/home/wilde/R/lib64/R/bin/exec/R:
+  error while loading shared libraries: libreadline.so.4:
+    cannot open shared object file: No such file or directory
+login1$ 
+
+*--
+
+-- Swift package *source* (tbd) is under:
+
+   ~/SwiftR/Swift (the "Swift" package)
+
+-- Swift package is installed under: ????????
+
+* Setup
+
+Get latest R in path for installs etc.
+
+   PATH=/home/wilde/R/R-2.11.0/bin:$PATH
+
+* Fetch, Build, Install OpenMx
+
+* Make Swift Package
+  
+
+FIXME: document R CMD BUILD and R CMD INSTALL here
+
+
+  cd ~/SwiftR/Swift?
+
+* How to build swift package into a source archive:
+
+  R CMD build Swift
+
+* package can also be fetched from svn abd built/installed from source I think?  Isnt this how OpenMx itself works?
+
+* How to build swift package right into source code
+
+* How to test the package
+
+  R CMD check Swift
+
+* Install Swift Package
+
+  R CMD INSTALL Swift # Puts package under current R release:
+
+  $ R CMD INSTALL Swift | tee INSTALL.out
+
+#--- Example:
+
+login1$ R CMD INSTALL Swift
+* installing to library '/home/wilde/R/R-2.11.0/library'
+* installing *source* package 'Swift' ...
+...etc
+
+#---
+
+  R CMD INSTALL -l ~/RLibrary Swift # Puts package under user lib; then need to add this to R search path?
+  R CMD INSTALL Swift_0.1.tar.gz  # Installs from a pre-built source archive instead of from Swift/ source dir
+
+* Run tests Swift package tests manually
+
+$ cd ~/SwiftR/Swift
+$ R
+> require(Swift)
+> source("tests/TestSwift.R")
+
+##################  INTERNAL DESIGN LOGIC
+
+the core R function is switapply()
+
+Its a bit more general then the lApply/sApply/etc functions:
+
+For each call it specfies a full set of arguments
+
+lApply calls swiftapply
+
+in swiftapply the remote calls are batched
+
+option processing:
+# describe here: func kw args; def vals mostly NULL; options() values override if kw not specified.
+
+Processing mode selects a set of  sites, a cf, and a tc.
+
+Site selects a site within a tc for a secific exec.
+
+rserver.swift runs an app() whose name encodes the site (eg: bashservice, bashlocal)
+
+Provider staging is a problem: its all or none. How to do provider staging for local? I think thats OK: hopefully its fast.
+
+Probem: would like to do multiple sites fomr the internal coaster service rather than an external coaster service
+
+---
+
+cd ~/SwiftR
+R CMD INSTALL Swift
+R CMD check Swift
+R CMD build Swift # produces ./Swift_0.1.tar.gz
+
+wget http://www.ci.uchicago.edu/~wilde/Swift_0.1.tar.hz
+R CMD INSTALL -l ~/RLibrary Swift_0.1.tar.gz
+export R_LIBS=~/RLibrary
+R
+require(Swift)
+
+

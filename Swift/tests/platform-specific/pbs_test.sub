@@ -1,0 +1,33 @@
+#PBS -S /bin/sh
+#PBS -N SwiftR-batch
+#PBS -m n
+#PBS -l nodes=1
+#PBS -l walltime=00:30:00
+
+HOST=$(echo http://192.5.86.6:48998 | sed -e 's,^http://,,' -e 's/:.*//')
+PORT=$(echo http://192.5.86.6:48998 | sed -e 's,^.*:,,')
+echo '***' PBS_NODEFILE file: $PBS_NODEFILE 
+cat $PBS_NODEFILE
+echo '***' unique nodes are:
+sort < $PBS_NODEFILE|uniq
+
+echo GLOBUS_HOSTNAME=$GLOBUS_HOSTNAME
+#export PATH=/autonfs/home/tga/R-2.12.1/bin:$PATH
+
+if which Rscript; then
+    echo Rscript binary found!
+else
+    echo Rscript binary not found in:
+    echo PATH=$PATH
+    echo Maybe you need to set PATH in this sub file
+    exit 1
+fi
+
+
+#Rscript `dirname $0`/batch_test.R pbs
+if [ -f $PBS_O_WORKDIR/Swift/tests/batch_test.R ]; then
+    Rscript $PBS_O_WORKDIR/Swift/tests/batch_test.R pbs
+else
+    echo Could not find batch_test.R.  Maybe try modifying this .sub file with the absolute path of the script.
+    exit 1
+fi

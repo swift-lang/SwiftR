@@ -1,0 +1,91 @@
+#! /usr/bin/env bash
+
+#TODO: is this best way to do this.
+
+# we assume that $time_secs specifies the lengths of jobs 
+# that should be submitted to pbs.  
+#We don't really know the expected duration of R jobs, so we will come up
+# with a sensible value based on $time-secs
+# 
+#Swift kills jobs that run for double maxwalltime, so maxwalltime should be
+# > 0.5 $time_secs
+# Ideally we want to run multiple jobs in each batch allocation, so we don't
+# want coasters to mistakenly decide that it can't schedule a job when we 
+# have most of the batch allocation left.  So we really want
+# maxwalltime to be just over 0.5 $time_secs, once we round both to minutes
+maxwalltime=$(( ($time_secs + 120) / 120 ))
+
+
+cat >tc <<END
+pbscoast  bash      /bin/bash null null ENV::PATH="$PATH";GLOBUS::maxwalltime="$maxwalltime"
+END
+
+cat >sites.xml <<END
+<config>
+
+
+  <pool handle="pbscoast">
+    <execution provider="coaster" url="none" jobmanager="local:pbs"/>
+    <filesystem provider="local" url="none"/>
+    <profile namespace="env" key="R_LIBS_USER">$R_LIBS_USER</profile>
+    <workdirectory>$(pwd)/swiftwork</workdirectory>
+    <scratch>$(pwd)/swiftscratch</scratch>
+    <profile namespace="karajan" key="jobThrottle">$throttle</profile>
+    <profile namespace="karajan" key="initialScore">10000</profile>
+
+    <!-- max number of cores in total -->
+    <profile namespace="globus" key="slots">$nodes</profile>
+    <profile namespace="globus" key="workersPerNode">$cores</profile>
+    <profile namespace="globus" key="ppn">$cores</profile>
+    
+    <!-- these settings control the size of the request blocks
+        put through the batch system -->
+    <profile namespace="globus" key="maxNodes">1</profile>
+    <profile namespace="globus" key="nodeGranularity">1</profile>
+    <profile namespace="globus" key="lowOverallocation">2</profile>
+    <profile namespace="globus" key="highOverallocation">2</profile>
+
+END
+if [ "$queue" != NONE ]; then
+    #TODO: error handling
+    # assume time in H:M:S format
+    cat >> sites.xml <<END
+    <profile namespace="globus" key="queue">$queue</profile>
+END
+fi
+
+if [ "$time" != NONE ]; then
+    # Hack: Add 60 seconds to time to convince to request blocks for
+    # full time.
+    cat >> sites.xml <<END
+    <profile namespace="globus" key="maxTime">$((time_secs + 60))</profile>
+END
+fi
+
+cat >> sites.xml <<END
+  </pool>
+</config>
+END
+
+cat >cf <<END
+wrapperlog.always.transfer=false
+sitedir.keep=false
+execution.retries=$num_retries
+lazy.errors=false
+status.mode=provider
+use.provider.staging=true
+provider.staging.pin.swiftfiles=true
+#throttle.host.submit=1
+END
+
+
+#  <pool handle="pbsdirect">
+#    <execution provider="pbs" url="none" />
+#    <profile namespace="globus" key="queue">fast</profile>
+#    <profile namespace="globus" key="maxwalltime">00:59:00</profile>
+#    <profile key="jobThrottle" namespace="karajan">$throttlePBS</profile>
+#    <profile namespace="karajan" key="initialScore">10000</profile>
+#    <filesystem provider="local" url="none" />
+#    <profile namespace="env" key="R_LIBS_USER">$R_LIBS_USER</profile>
+#    <workdirectory>$HOME/swiftwork</workdirectory>
+#  </pool>

@@ -1,0 +1,85 @@
+#! /usr/bin/env bash
+# Read contents of a fifo with a timeout
+# If reading from a fifo fails within timeout specified
+# with -t option in milliseconds then the message _FIFOTIMEOUT_ with
+# a trailing newline is echoed to stdout and no more reading occurs.  
+# The program also returns with exit code 2 in this instance.
+# If some data was read from the fifo, and the process subsequently blocks
+# waiting for data, the data will be lost.
+
+fifo=$1
+shift
+timeout=0
+while getopts "t:" OPT
+do
+    case $OPT in
+        t)
+            if [ $OPTARG -eq $OPTARG ]; then
+                timeout=$OPTARG
+            else
+                echo "$timeout" is not an integer
+                exit 1
+            fi ;;
+        \?)
+            echo "Invalid option: $OPTARG" ;;
+    esac
+done
+outfile=`mktemp -t swiftR.XXXXXX`
+
+function cleanup {
+    if [ "$tout_pid" != "" ]; then
+        # stop timeout process from lingering
+        kill $tout_pid &> /dev/null
+    fi
+    if [ "$catpid" != "" ]; then
+        # stop timeout process from lingering
+        kill $catpid &> /dev/null
+    fi
+}
+
+
+# fork off a process to read from fifo and write to
+# temp file
+tout_pid=""
+catpid=""
+
+cat $fifo &> "$outfile" &
+
+catpid=$!
+trap "cleanup" EXIT 1 2 3 15
+
+if [ "$timeout" -gt 0 ];
+then
+    stimeout=`echo "scale=3; $timeout/1000.0" | bc`
+    # fork subshell to terminate process
+    (sleep "$stimeout" 
+        # Make sure we bring sleep down with self
+        if [ 1 -eq `ps h --pid $catpid | wc -l` ]
+        then
+            # timeout exceeded, kill processes
+            kill -15 $catpid 
+        fi
+    )&>/dev/null  &
+    # Send output to dev/null so that file descriptors are closed
+    # otherwise R system(... intern=TRUE) call will wait unil fds
+    # are closed
+    tout_pid=$!
+fi
+
+if wait $catpid
+then
+    catpid=""
+    # cat exited normally
+    cleanup
+    # Print output
+    cat "$outfile"
+    rm "$outfile"
+    exit 0
+else
+    catpid=""
+    cleanup
+    echo "_FIFOTIMEOUT_"
+    rm "$outfile"
+    #TODO: kill timeout thread
+    exit 2
+fi

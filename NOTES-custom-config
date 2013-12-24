@@ -1,0 +1,54 @@
+This is currently just a repository for notes about the custom swift feature.
+
+Pros:
+-----
+* Can use resources not supported directly by SwiftR
+* Dynamic provisioning of workers
+* Additional configurability
+* Can handle situations beyond what snowfall can.
+
+Cons:
+-----
+* Additional complexity of having to write own sites, etc file
+* Less responsive: typically rely on workers to fire up after apply job is started
+
+Use Cases:
+----------
+* Long-running script where we want to be able to dynamically procure workers
+   - don't want to be in situation where batch allocation ends and job fails
+* More complex situations - e.g. running swift on a grid or multiple sites
+We can either use a coaster provider, or a non-coaster provider (e.g. GRAM or condor)
+
+Coasters Provider:
+-------------------
+- This should be the primary use case
+- What are sensible default settings?
+- What settings do users actually need to change?  Is there an easier way to handle common cases than always requiring users to write a file from scratch?
+
+- Problem: coasters seem to be released when swift work queue gets short at
+    end of apply job, but R could be about to release another set of jobs.
+
+Non-Coasters Provider:
+-----------------------
+- Doesn't make sense to use EvalRBatchPersistent script as each job will only be run once
+- This only suits long-running data crunching
+
+
+How to configure
+-----
+system requirements:
+* R needs to be on the default path on worker nodes
+
+sites file:
+* Need one or more work pools
+
+tc data:
+* Need bash for each pool
+
+cf:
+* no special settings required
+
+
+Unresolved Problems:
+-------------------
+- Export requires shared file system currently: need to specify all input dependencies on swift command line
